@@ -158,7 +158,7 @@ cv.addEventListener('click', e => {
   const mx = e.clientX - r.left, my = e.clientY - r.top;
   const clicked = GUILDS.findIndex(g => hit(mx, my, g));
   if (clicked >= 0) {
-    window.open('District.html', '_blank');
+    window.location.href = 'District.html';
   }
 });
 
