@@ -433,9 +433,9 @@ function closeRegionPopup(){
 function enterRegion(){
   closeRegionPopup();
   const url=_regionIsTown
-    ?'file:///C:/Users/b1gbo/Desktop/Demo/realm_final(3).html'
-    :`file:///C:/Users/b1gbo/Desktop/Demo/Lands.html?fromC=${player.c}&fromR=${player.r}`;
-  window.open(url,'_blank');
+    ?'realm_final(3).html'
+    :`Lands.html?fromC=${player.c}&fromR=${player.r}`;
+  window.location.href = url;
 }
 
 // ── Info panel ─────────────────────────────────────────────────────────────
