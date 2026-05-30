@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Realm — Land Map</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;user-select:none;}
+body{background:#0a0a14;font-family:'Segoe UI',sans-serif;overflow:hidden;}
+#topbar{height:38px;background:#0f0f1a;border-bottom:1px solid #2a2a4a;display:flex;align-items:center;padding:0 14px;gap:10px;z-index:20;position:relative;}
+#topbar h1{color:#c9a84c;font-size:12px;letter-spacing:2px;text-transform:uppercase;white-space:nowrap;}
+.chip{background:#1a1a2e;border:1px solid #2a2a4a;border-radius:4px;padding:2px 8px;font-size:10px;color:#aaa;white-space:nowrap;}
+.chip span{color:#c9a84c;font-weight:700;}
+#zoomBtn{margin-left:auto;padding:4px 12px;background:#0a100a;border:1px solid #2a4a2a;color:#5a9a5a;border-radius:4px;cursor:pointer;font-size:10px;font-family:inherit;}
+#zoomBtn:hover{border-color:#27ae60;color:#27ae60;}
+#c{display:block;}
+#panel{position:fixed;top:38px;right:0;width:220px;background:#0a0a16ee;border-left:1px solid #2a2a4a;height:calc(100vh - 38px);overflow-y:auto;padding:12px;display:none;z-index:15;backdrop-filter:blur(6px);}
+.pRow{display:flex;justify-content:space-between;font-size:10px;color:#555;padding:4px 0;border-bottom:1px solid #111122;}
+.pRow span{color:#ccc;}
+.pBtn{width:100%;margin-top:7px;padding:7px 0;border-radius:4px;cursor:pointer;font-size:10px;font-family:inherit;}
+.pClaim{background:#0a1a0a;border:1px solid #27ae6088;color:#27ae60;}
+.pClaim:hover{background:#0f2a0f;border-color:#27ae60;}
+.pClose{background:transparent;border:1px solid #2a2a4a;color:#555;margin-top:3px;}
+.pClose:hover{border-color:#c9a84c;color:#c9a84c;}
+#notif{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);background:#0a0a1a;border:1px solid #c9a84c55;border-radius:6px;padding:5px 16px;color:#c9a84c;font-size:11px;pointer-events:none;opacity:0;transition:opacity .4s;white-space:nowrap;z-index:300;}
+#hint{position:fixed;bottom:8px;right:10px;font-size:9px;color:#2a2a4a;text-align:right;line-height:2;pointer-events:none;}
+/* ── Minimap ── */
+#mmWrap{position:fixed;top:48px;right:10px;z-index:50;pointer-events:none;}
+#mmLabel{font-size:8px;color:#2a2a4a;text-align:center;letter-spacing:.8px;text-transform:uppercase;margin-bottom:3px;}
+#mmCanvas{border:1px solid #1e1e3a;border-radius:3px;display:block;}
+/* ── Sign Board Modal ── */
+#signOverlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:800;display:none;align-items:center;justify-content:center;backdrop-filter:blur(3px);}
+#signOverlay.open{display:flex;}
+#signModal{background:#0d0d1e;border:2px solid #7a5a2a;border-radius:12px;width:420px;max-width:96vw;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 0 60px rgba(0,0,0,0.9),0 0 20px rgba(180,130,40,0.15);}
+#signModalTop{background:#0a0814;border-radius:10px 10px 0 0;padding:14px 16px 10px;border-bottom:1px solid #2a2a1a;flex-shrink:0;}
+#signModalTop .smTitle{color:#c9a84c;font-size:14px;font-weight:700;letter-spacing:.5px;margin-bottom:2px;}
+#signModalTop .smSub{color:#555;font-size:9px;}
+#signTabs{display:flex;border-bottom:1px solid #1e1e2e;flex-shrink:0;}
+.sTab{flex:1;padding:8px 4px;font-size:10px;text-align:center;color:#444;cursor:pointer;text-transform:uppercase;letter-spacing:.8px;border-bottom:2px solid transparent;transition:color .15s;}
+.sTab.on{color:#c9a84c;border-bottom-color:#c9a84c;}
+.sTab:hover{color:#888;}
+#signBody{flex:1;overflow-y:auto;padding:14px;}
+/* Info tab */
+.siRow{display:flex;justify-content:space-between;font-size:10px;color:#555;padding:5px 0;border-bottom:1px solid #0f0f1e;}
+.siRow span{color:#bbb;}
+/* Board tab */
+.msgCard{background:#0a0a18;border:1px solid #1e1e2e;border-radius:6px;padding:8px 10px;margin-bottom:6px;}
+.msgCard .msgAuthor{font-size:10px;font-weight:700;color:#c9a84c;margin-bottom:3px;}
+.msgCard .msgText{font-size:10px;color:#aaa;line-height:1.5;}
+.msgCard .msgTime{font-size:8px;color:#333;margin-top:4px;}
+.postForm{margin-top:10px;border-top:1px solid #1e1e2e;padding-top:10px;}
+.postForm input,.postForm textarea{width:100%;background:#080816;border:1px solid #2a2a3a;color:#ccc;border-radius:4px;padding:6px 8px;font-size:10px;font-family:inherit;outline:none;margin-bottom:6px;resize:none;}
+.postForm input:focus,.postForm textarea:focus{border-color:#c9a84c44;}
+.postForm textarea{height:56px;}
+.sbBtn{padding:5px 14px;background:#0a100a;border:1px solid #27ae6066;color:#27ae60;border-radius:4px;cursor:pointer;font-size:10px;font-family:inherit;}
+.sbBtn:hover{border-color:#27ae60;background:#0f2a0f;}
+.sbBtnGold{background:#100a00;border:1px solid #c9a84c66;color:#c9a84c;}
+.sbBtnGold:hover{border-color:#c9a84c;background:#1a1200;}
+.sbBtnClose{float:right;background:none;border:1px solid #2a2a3a;color:#444;border-radius:4px;cursor:pointer;font-size:11px;padding:2px 8px;}
+.sbBtnClose:hover{border-color:#c9a84c;color:#c9a84c;}
+/* Offers tab */
+.offerCard{background:#0a0a18;border:1px solid #1e1e2e;border-radius:6px;padding:8px 10px;margin-bottom:6px;}
+.offerCard .ofType{font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:#555;margin-bottom:3px;}
+.offerCard .ofDetail{font-size:10px;color:#bbb;}
+.offerCard .ofPrice{color:#c9a84c;font-weight:700;}
+.offerCard .ofAuthor{font-size:8px;color:#333;margin-top:4px;}
+.ofForm{margin-top:10px;border-top:1px solid #1e1e2e;padding-top:10px;}
+.ofForm label{display:block;font-size:8px;color:#444;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;margin-top:6px;}
+.ofForm input,.ofForm select{width:100%;background:#080816;border:1px solid #2a2a3a;color:#ccc;border-radius:4px;padding:5px 8px;font-size:10px;font-family:inherit;outline:none;}
+.ofForm input:focus,.ofForm select:focus{border-color:#c9a84c44;}
+.emptyState{color:#333;font-size:10px;text-align:center;padding:24px 0;}
+</style>
+</head>
+<body>
+<div id="topbar">
+  <h1>&#9876; Realm &mdash; Land Map</h1>
+  <div class="chip">Parcel <span id="coordTxt">0,0</span></div>
+  <div class="chip">Claimed <span id="claimedTxt">0</span> / 1024</div>
+  <button id="zoomBtn" onclick="toggleZoom()">&#128301; View All Lands</button>
+</div>
+<canvas id="c" tabindex="0"></canvas>
+<div id="panel"><div id="panelBody"></div></div>
+<div id="notif"></div>
+<div id="hint">WASD / Arrows &mdash; move<br>Click parcel &mdash; select<br>M &mdash; toggle overview</div>
+<!-- Sign Board Modal -->
+<div id="signOverlay">
+  <div id="signModal">
+    <div id="signModalTop">
+      <button class="sbBtnClose" onclick="closeSignBoard()">&#10005;</button>
+      <div class="smTitle" id="smTitle">📋 Land Board</div>
+      <div class="smSub" id="smSub">Parcel 0,0 &mdash; Plains</div>
+    </div>
+    <div id="signTabs">
+      <div class="sTab on"  onclick="switchSignTab('info')">&#9432; Info</div>
+      <div class="sTab"     onclick="switchSignTab('board')">&#128203; Board</div>
+      <div class="sTab"     onclick="switchSignTab('offers')">&#128176; Offers</div>
+    </div>
+    <div id="signBody"></div>
+  </div>
+</div>
+<div id="mmWrap">
+  <div id="mmLabel">Map</div>
+  <canvas id="mmCanvas"></canvas>
+</div>
+
+<script>
+// ── Constants ──────────────────────────────────────────────────────────────
+const TILE  = 48;
+const P_T   = 5;     // tiles per parcel side
+const G_W   = 32;    // parcels wide
+const G_H   = 32;    // parcels tall  →  32×32 = 1024 parcels
+const MAP_W = G_W * P_T * TILE;   // 7 680 px
+const MAP_H = G_H * P_T * TILE;   // 7 680 px
+
+// 1.875 min = 112.5 s at 60 fps = 6 750 frames to cross MAP_W
+const SPD = MAP_W / (1.875 * 60 * 60); // ≈ 1.138 px / frame
+
+// ── Canvas ─────────────────────────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+let W = 0, H = 0;
+function resize(){ W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight - 38; }
+window.addEventListener('resize', resize);
+
+// ── Biomes ─────────────────────────────────────────────────────────────────
+const BIOMES = ['plains','forest','highland','wetland','desert','ruins','tundra','savanna'];
+const BC = {
+  plains:'#253f14', forest:'#142d0c', highland:'#3b2d16',
+  wetland:'#122e2e', desert:'#55431a', ruins:'#2b1e30',
+  tundra:'#253040',  savanna:'#4a3d10'
+};
+const BI = {
+  plains:'🌿', forest:'🌲', highland:'⛰️', wetland:'🌾',
+  desert:'🏜️', ruins:'🏚️', tundra:'❄️', savanna:'🌵'
+};
+
+// ── Hash ───────────────────────────────────────────────────────────────────
+function hash(a, b){
+  let h = (a * 31337 + b * 7919) | 0;
+  h = ((h ^ (h >>> 16)) * 0x45d9f3b) | 0;
+  h = ((h ^ (h >>> 16)) * 0x45d9f3b) | 0;
+  return (h ^ (h >>> 16)) & 0x7fffffff;
+}
+
+// ── Generate parcels ───────────────────────────────────────────────────────
+const parcels = {};
+for(let r = 0; r < G_H; r++) for(let c = 0; c < G_W; c++){
+  const bi = hash(c, r) % BIOMES.length;
+  parcels[`${c}_${r}`] = { c, r, biome: BIOMES[bi], owner: null, color: null, messages: [], offers: [] };
+}
+
+// ── Overview canvas (1 px = 1 parcel, fog-aware) ──────────────────────────
+const ov = document.createElement('canvas');
+ov.width = G_W; ov.height = G_H;
+const ovCtx = ov.getContext('2d');
+function rebuildOv(){
+  for(let r = 0; r < G_H; r++) for(let c = 0; c < G_W; c++){
+    const key = `${c}_${r}`;
+    const p   = parcels[key];
+    ovCtx.fillStyle = visited.has(key) ? (p.owner ? p.color : BC[p.biome]) : '#06060e';
+    ovCtx.fillRect(c, r, 1, 1);
+  }
+}
+
+// ── Minimap canvas ─────────────────────────────────────────────────────────
+const MM_CELL = 5;               // px per parcel on minimap
+const MM_W    = G_W * MM_CELL;   // 160
+const MM_H    = G_H * MM_CELL;   // 160
+const mmCanvas = document.getElementById('mmCanvas');
+mmCanvas.width = MM_W; mmCanvas.height = MM_H;
+const mmCtx = mmCanvas.getContext('2d');
+
+// ── Fog of war ─────────────────────────────────────────────────────────────
+const visited = new Set(); // "c_r" keys the player has been near
+
+function revealAround(pc, pr){
+  const R = 2;
+  let changed = false;
+  for(let dr = -R; dr <= R; dr++){
+    for(let dc = -R; dc <= R; dc++){
+      if(dc*dc + dr*dr > R*R) continue;
+      const key = `${Math.max(0,Math.min(G_W-1,pc+dc))}_${Math.max(0,Math.min(G_H-1,pr+dr))}`;
+      if(!visited.has(key)){ visited.add(key); changed = true; }
+    }
+  }
+  return changed;
+}
+
+// ── Portal (back to District.html) ─────────────────────────────────────────
+const _up = new URLSearchParams(window.location.search);
+const _portalFromC = parseInt(_up.get('fromC'));
+const _portalFromR = parseInt(_up.get('fromR'));
+const _hasPortal   = !isNaN(_portalFromC) && !isNaN(_portalFromR);
+const PORTAL_WX    = MAP_W / 2;
+const PORTAL_WY    = MAP_H / 2 - 160; // slightly north of spawn
+
+// ── State ──────────────────────────────────────────────────────────────────
+let player    = { x: MAP_W / 2, y: MAP_H / 2 };
+let camX = player.x - 800, camY = player.y - 400;
+let keys      = {};
+let zoomedOut = false;
+let selKey    = null;
+let notifT    = null;
+
+function showNotif(msg){
+  const el = document.getElementById('notif');
+  el.textContent = msg; el.style.opacity = '1';
+  clearTimeout(notifT);
+  notifT = setTimeout(() => el.style.opacity = '0', 2600);
+}
+
+// ── Draw world ─────────────────────────────────────────────────────────────
+function drawWorld(){
+  camX = Math.max(0, Math.min(MAP_W - W, camX));
+  camY = Math.max(0, Math.min(MAP_H - H, camY));
+
+  const pw = P_T * TILE;
+  const c0 = Math.max(0, Math.floor(camX / pw));
+  const c1 = Math.min(G_W - 1, Math.ceil((camX + W) / pw));
+  const r0 = Math.max(0, Math.floor(camY / pw));
+  const r1 = Math.min(G_H - 1, Math.ceil((camY + H) / pw));
+
+  for(let r = r0; r <= r1; r++){
+    for(let c = c0; c <= c1; c++){
+      const p   = parcels[`${c}_${r}`];
+      const sx  = c * pw - camX;
+      const sy  = r * pw - camY;
+      const sel = selKey === `${c}_${r}`;
+
+      ctx.fillStyle = p.owner ? p.color : BC[p.biome];
+      ctx.fillRect(sx, sy, pw, pw);
+
+      // Subtle tile grid lines
+      ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+      ctx.lineWidth = 0.5;
+      for(let t = 1; t < P_T; t++){
+        ctx.beginPath(); ctx.moveTo(sx + t*TILE, sy); ctx.lineTo(sx + t*TILE, sy+pw); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(sx, sy + t*TILE); ctx.lineTo(sx+pw, sy + t*TILE); ctx.stroke();
+      }
+
+      // Parcel border
+      ctx.strokeStyle = sel ? '#c9a84c' : 'rgba(0,0,0,0.55)';
+      ctx.lineWidth   = sel ? 2.5 : 1;
+      ctx.strokeRect(sx + 0.5, sy + 0.5, pw - 1, pw - 1);
+
+      // Biome icon
+      ctx.font = '26px serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.globalAlpha = 0.22;
+      ctx.fillStyle = '#fff';
+      ctx.fillText(BI[p.biome], sx + pw/2, sy + pw/2);
+      ctx.globalAlpha = 1;
+
+      // Owner label
+      if(p.owner){
+        ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        ctx.font = 'bold 9px Segoe UI';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(p.owner, sx + pw/2, sy + pw/2 + 16);
+      }
+
+      // Coord
+      ctx.fillStyle = 'rgba(255,255,255,0.17)';
+      ctx.font = '7px monospace';
+      ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+      ctx.fillText(`${c},${r}`, sx + 3, sy + 3);
+    }
+  }
+
+  // Signs — drawn after parcels, before player
+  for(let r = r0; r <= r1; r++){
+    for(let c = c0; c <= c1; c++){
+      const sx = c * pw - camX, sy = r * pw - camY;
+      drawSign(ctx, sx + pw/2, sy + pw * 0.68, c, r);
+    }
+  }
+
+  // Portal
+  if(_hasPortal){
+    const ppx = PORTAL_WX - camX, ppy = PORTAL_WY - camY;
+    drawPortal(ctx, ppx, ppy);
+  }
+
+  // Player
+  const px = player.x - camX, py = player.y - camY;
+  ctx.save();
+  ctx.shadowColor = '#c9a84c'; ctx.shadowBlur = 14;
+  ctx.fillStyle = '#c9a84c';
+  ctx.beginPath(); ctx.arc(px, py, 8, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.restore();
+}
+
+function drawSign(cx, x, y, pc, pr){
+  if(pc === 16 && pr === 15){
+    drawSignSkin(cx, x, y);
+    return;
+  }
+  // Default sign
+  cx.fillStyle = '#4a2e0e';
+  cx.fillRect(x - 3, y - 2, 6, 22);
+  cx.fillStyle = '#c8922a';
+  cx.strokeStyle = '#4a2e0e';
+  cx.lineWidth = 1.5;
+  cx.beginPath(); cx.rect(x - 18, y - 20, 36, 22); cx.fill(); cx.stroke();
+  cx.strokeStyle = 'rgba(74,46,14,0.35)';
+  cx.lineWidth = 1;
+  cx.beginPath(); cx.moveTo(x-13, y-13); cx.lineTo(x+13, y-13); cx.stroke();
+  cx.beginPath(); cx.moveTo(x-13, y-7);  cx.lineTo(x+13, y-7);  cx.stroke();
+  cx.beginPath(); cx.moveTo(x-13, y-1);  cx.lineTo(x+8,  y-1);  cx.stroke();
+  cx.fillStyle = '#4a2e0e';
+  cx.beginPath(); cx.arc(x-15, y-17, 2, 0, Math.PI*2); cx.fill();
+  cx.beginPath(); cx.arc(x+15, y-17, 2, 0, Math.PI*2); cx.fill();
+}
+
+function drawSignSkin(cx, x, y){
+  // Taller ornate post
+  cx.fillStyle = '#2a1505';
+  cx.fillRect(x - 5, y - 10, 10, 38);
+  cx.fillStyle = '#5a3010';
+  cx.fillRect(x - 3, y - 10, 4, 38);
+
+  // Shield-shaped board (wider + pointed bottom)
+  const bw = 54, bh = 44, bt = y - 68;
+  cx.save();
+  cx.beginPath();
+  cx.moveTo(x - bw/2, bt);               // top-left
+  cx.lineTo(x + bw/2, bt);               // top-right
+  cx.lineTo(x + bw/2, bt + bh * 0.68);  // right side
+  cx.lineTo(x,         bt + bh);          // pointed bottom
+  cx.lineTo(x - bw/2, bt + bh * 0.68);  // left side
+  cx.closePath();
+
+  // Drop shadow
+  cx.shadowColor = 'rgba(0,0,0,0.5)';
+  cx.shadowBlur  = 6;
+  cx.shadowOffsetX = 2; cx.shadowOffsetY = 3;
+  cx.fillStyle = '#1a0a2e';
+  cx.fill();
+  cx.shadowColor = 'transparent';
+
+  // Gold border
+  cx.strokeStyle = '#c9a84c';
+  cx.lineWidth = 2.5;
+  cx.stroke();
+
+  // Inner face (deep purple)
+  cx.beginPath();
+  cx.moveTo(x - bw/2 + 5, bt + 5);
+  cx.lineTo(x + bw/2 - 5, bt + 5);
+  cx.lineTo(x + bw/2 - 5, bt + bh * 0.66);
+  cx.lineTo(x,              bt + bh - 8);
+  cx.lineTo(x - bw/2 + 5, bt + bh * 0.66);
+  cx.closePath();
+  cx.fillStyle = '#2a1245';
+  cx.fill();
+
+  // Decorative gold inner border
+  cx.strokeStyle = 'rgba(201,168,76,0.4)';
+  cx.lineWidth = 1;
+  cx.stroke();
+  cx.restore();
+
+  // Stars at top corners
+  drawStar(cx, x - bw/2 + 6, bt + 8,  5, '#c9a84c');
+  drawStar(cx, x + bw/2 - 6, bt + 8,  5, '#c9a84c');
+
+  // Centre ornament (glowing orb)
+  const oy2 = bt + bh * 0.38;
+  cx.save();
+  const grad = cx.createRadialGradient(x, oy2, 0, x, oy2, 9);
+  grad.addColorStop(0,   '#fff8d0');
+  grad.addColorStop(0.4, '#c9a84c');
+  grad.addColorStop(1,   'rgba(60,20,0,0)');
+  cx.fillStyle = grad;
+  cx.beginPath(); cx.arc(x, oy2, 9, 0, Math.PI*2); cx.fill();
+  cx.restore();
+
+  // Text lines
+  cx.fillStyle = 'rgba(201,168,76,0.5)';
+  cx.fillRect(x - 16, oy2 + 13, 32, 1.5);
+  cx.fillRect(x - 12, oy2 + 18, 24, 1.5);
+}
+
+function drawPortal(cx, x, y){
+  cx.save();
+  cx.shadowColor = '#5588ff';
+  cx.shadowBlur  = 28;
+  cx.strokeStyle = '#5588ff';
+  cx.lineWidth   = 3;
+  cx.beginPath(); cx.arc(x, y, 22, 0, Math.PI*2); cx.stroke();
+  const grad = cx.createRadialGradient(x, y, 0, x, y, 22);
+  grad.addColorStop(0,   'rgba(120,170,255,0.55)');
+  grad.addColorStop(0.6, 'rgba(60,90,220,0.30)');
+  grad.addColorStop(1,   'rgba(20,30,100,0.05)');
+  cx.fillStyle = grad;
+  cx.beginPath(); cx.arc(x, y, 22, 0, Math.PI*2); cx.fill();
+  cx.restore();
+  cx.font = '18px serif';
+  cx.textAlign = 'center'; cx.textBaseline = 'middle';
+  cx.fillText('🌀', x, y);
+  cx.save();
+  cx.shadowColor = '#5588ff'; cx.shadowBlur = 8;
+  cx.font = 'bold 9px Segoe UI';
+  cx.textAlign = 'center'; cx.textBaseline = 'top';
+  cx.fillStyle = '#88aaff';
+  cx.fillText('Return to District', x, y + 27);
+  cx.restore();
+}
+
+function drawStar(cx, x, y, r, color){
+  cx.save();
+  cx.fillStyle = color;
+  cx.beginPath();
+  for(let i = 0; i < 5; i++){
+    const a1 = (i * 4 * Math.PI / 5) - Math.PI/2;
+    const a2 = ((i * 4 + 2) * Math.PI / 5) - Math.PI/2;
+    if(i===0) cx.moveTo(x + r*Math.cos(a1), y + r*Math.sin(a1));
+    else       cx.lineTo(x + r*Math.cos(a1), y + r*Math.sin(a1));
+    cx.lineTo(x + r*0.4*Math.cos(a2), y + r*0.4*Math.sin(a2));
+  }
+  cx.closePath(); cx.fill();
+  cx.restore();
+}
+
+// ── Draw overview (all 1024 lands visible at once) ─────────────────────────
+function drawOverview(){
+  const scale = Math.min(W / G_W, H / G_H);
+  const dw = G_W * scale, dh = G_H * scale;
+  const ox = (W - dw) / 2, oy = (H - dh) / 2;
+
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(ov, ox, oy, dw, dh);
+  ctx.imageSmoothingEnabled = true;
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+  ctx.lineWidth = 0.5;
+  for(let c = 0; c <= G_W; c++){ ctx.beginPath(); ctx.moveTo(ox+c*scale,oy); ctx.lineTo(ox+c*scale,oy+dh); ctx.stroke(); }
+  for(let r = 0; r <= G_H; r++){ ctx.beginPath(); ctx.moveTo(ox,oy+r*scale); ctx.lineTo(ox+dw,oy+r*scale); ctx.stroke(); }
+
+  // Selected highlight
+  if(selKey){
+    const [sc,sr] = selKey.split('_').map(Number);
+    ctx.strokeStyle = '#c9a84c'; ctx.lineWidth = 2;
+    ctx.strokeRect(ox + sc*scale, oy + sr*scale, scale, scale);
+  }
+
+  // Current viewport rect
+  const vx = ox + (camX / MAP_W) * dw;
+  const vy = oy + (camY / MAP_H) * dh;
+  const vw = (W  / MAP_W) * dw;
+  const vh = (H  / MAP_H) * dh;
+  ctx.strokeStyle = 'rgba(201,168,76,0.4)'; ctx.lineWidth = 1;
+  ctx.strokeRect(vx, vy, vw, vh);
+
+  // Player dot
+  const px = ox + (player.x / MAP_W) * dw;
+  const py = oy + (player.y / MAP_H) * dh;
+  ctx.fillStyle = '#c9a84c';
+  ctx.beginPath(); ctx.arc(px, py, Math.max(4, scale * 0.35), 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+}
+
+// ── Minimap draw ───────────────────────────────────────────────────────────
+function drawMinimap(){
+  // Base: all parcels, fog-dark if unvisited
+  for(let r = 0; r < G_H; r++){
+    for(let c = 0; c < G_W; c++){
+      const key = `${c}_${r}`;
+      const p   = parcels[key];
+      if(visited.has(key)){
+        mmCtx.fillStyle = p.owner ? p.color : BC[p.biome];
+      } else {
+        mmCtx.fillStyle = '#06060e'; // fog of war
+      }
+      mmCtx.fillRect(c * MM_CELL, r * MM_CELL, MM_CELL, MM_CELL);
+    }
+  }
+
+  // Dim border between parcels (1px lines)
+  mmCtx.strokeStyle = 'rgba(0,0,0,0.4)';
+  mmCtx.lineWidth   = 0.5;
+  for(let c = 1; c < G_W; c++){ mmCtx.beginPath(); mmCtx.moveTo(c*MM_CELL,0); mmCtx.lineTo(c*MM_CELL,MM_H); mmCtx.stroke(); }
+  for(let r = 1; r < G_H; r++){ mmCtx.beginPath(); mmCtx.moveTo(0,r*MM_CELL); mmCtx.lineTo(MM_W,r*MM_CELL); mmCtx.stroke(); }
+
+  // Viewport rect (only meaningful in walk mode)
+  if(!zoomedOut){
+    const vx = Math.max(0,(camX / MAP_W) * MM_W);
+    const vy = Math.max(0,(camY / MAP_H) * MM_H);
+    const vw = Math.min(MM_W - vx, (W / MAP_W) * MM_W);
+    const vh = Math.min(MM_H - vy, (H / MAP_H) * MM_H);
+    mmCtx.strokeStyle = 'rgba(201,168,76,0.55)';
+    mmCtx.lineWidth   = 1;
+    mmCtx.strokeRect(vx, vy, vw, vh);
+  }
+
+  // Player dot
+  const px = (player.x / MAP_W) * MM_W;
+  const py = (player.y / MAP_H) * MM_H;
+  mmCtx.fillStyle = '#c9a84c';
+  mmCtx.beginPath(); mmCtx.arc(px, py, 3, 0, Math.PI*2); mmCtx.fill();
+  mmCtx.strokeStyle = '#fff'; mmCtx.lineWidth = 1; mmCtx.stroke();
+}
+
+// ── Update ─────────────────────────────────────────────────────────────────
+function update(){
+  let dx = 0, dy = 0;
+  if(keys['ArrowLeft']  || keys['KeyA']) dx = -1;
+  if(keys['ArrowRight'] || keys['KeyD']) dx =  1;
+  if(keys['ArrowUp']    || keys['KeyW']) dy = -1;
+  if(keys['ArrowDown']  || keys['KeyS']) dy =  1;
+  if(dx && dy){ dx *= 0.707; dy *= 0.707; }
+
+  const spd = SPD;
+  player.x = Math.max(0, Math.min(MAP_W, player.x + dx * spd));
+  player.y = Math.max(0, Math.min(MAP_H, player.y + dy * spd));
+  camX = player.x - W / 2;
+  camY = player.y - H / 2;
+
+  const pw = P_T * TILE;
+  const pc = Math.min(G_W-1, Math.floor(player.x / pw));
+  const pr = Math.min(G_H-1, Math.floor(player.y / pw));
+  const newTiles = revealAround(pc, pr);
+  if(newTiles && zoomedOut) rebuildOv();
+  document.getElementById('coordTxt').textContent = `${pc},${pr}`;
+}
+
+function draw(){
+  ctx.clearRect(0, 0, W, H);
+  if(zoomedOut) drawOverview();
+  else          drawWorld();
+  drawMinimap();
+}
+
+function loop(){ update(); draw(); requestAnimationFrame(loop); }
+
+// ── Input ──────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) e.preventDefault();
+  if(e.code === 'KeyM') toggleZoom();
+});
+document.addEventListener('keyup', e => keys[e.code] = false);
+
+function toggleZoom(){
+  zoomedOut = !zoomedOut;
+  if(zoomedOut) rebuildOv();
+  document.getElementById('zoomBtn').textContent = zoomedOut ? '🔍 Walk Mode' : '🔭 View All Lands';
+}
+
+// ── Click ──────────────────────────────────────────────────────────────────
+canvas.addEventListener('click', e => {
+  const rect = canvas.getBoundingClientRect();
+  const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
+  let gc, gr;
+
+  if(zoomedOut){
+    const scale = Math.min(W / G_W, H / G_H);
+    const ox = (W - G_W*scale)/2, oy = (H - G_H*scale)/2;
+    gc = Math.floor((cx - ox) / scale);
+    gr = Math.floor((cy - oy) / scale);
+  } else {
+    const pw = P_T * TILE;
+    gc = Math.floor((cx + camX) / pw);
+    gr = Math.floor((cy + camY) / pw);
+
+    // Check portal click
+    if(_hasPortal){
+      const ppx = PORTAL_WX - camX, ppy = PORTAL_WY - camY;
+      if(Math.hypot(cx - ppx, cy - ppy) < 26){
+        window.open(`file:///C:/Users/b1gbo/Desktop/Demo/District.html?c=${_portalFromC}&r=${_portalFromR}`, '_blank');
+        return;
+      }
+    }
+    // Check sign click (only in walk mode — signs are world-space)
+    const signX = (gc + 0.5) * pw - camX;
+    const signY = (gr + 0.68) * pw - camY;
+    if(Math.hypot(cx - signX, cy - signY) < 22){
+      openSignBoard(gc, gr);
+      return;
+    }
+  }
+  if(gc < 0 || gc >= G_W || gr < 0 || gr >= G_H) return;
+  selKey = `${gc}_${gr}`;
+  openPanel(gc, gr);
+});
+
+// ── Panel ──────────────────────────────────────────────────────────────────
+function openPanel(c, r){
+  const p = parcels[`${c}_${r}`];
+  document.getElementById('panel').style.display = 'block';
+  document.getElementById('panelBody').innerHTML = `
+    <div style="color:#c9a84c;font-size:13px;font-weight:700;margin-bottom:10px;">${BI[p.biome]} Parcel ${c}, ${r}</div>
+    <div class="pRow">Biome <span>${p.biome.charAt(0).toUpperCase()+p.biome.slice(1)}</span></div>
+    <div class="pRow">Status <span style="color:${p.owner?'#e74c3c':'#27ae60'}">${p.owner?'Owned':'Available'}</span></div>
+    ${p.owner?`<div class="pRow">Owner <span style="color:${p.color}">${p.owner}</span></div>`:''}
+    <div class="pRow">Size <span>${P_T}&times;${P_T} tiles</span></div>
+    <div style="height:1px;background:#1a1a3a;margin:10px 0;"></div>
+    <div style="font-size:9px;color:#444;margin-bottom:8px;">Tiles ${c*P_T}&ndash;${(c+1)*P_T-1} &times; ${r*P_T}&ndash;${(r+1)*P_T-1}</div>
+    ${!p.owner?`<button class="pBtn pClaim" onclick="claimParcel('${c}','${r}')">&#127988; Claim this land</button>`:''}
+    <button class="pBtn pClose" onclick="closePanel()">&#10005; Close</button>
+  `;
+}
+
+function claimParcel(c, r){
+  const name = prompt('Enter your character name to claim:');
+  if(!name || !name.trim()) return;
+  const p = parcels[`${c}_${r}`];
+  if(p.owner){ showNotif('Already claimed!'); return; }
+  p.owner = name.trim();
+  const hue = hash(c*97+r, 29) % 360;
+  p.color = `hsl(${hue},32%,26%)`;
+  rebuildOv();
+  openPanel(+c, +r);
+  const claimed = Object.values(parcels).filter(q => q.owner).length;
+  document.getElementById('claimedTxt').textContent = claimed;
+  showNotif('Land claimed by ' + p.owner + '!');
+}
+
+function closePanel(){
+  document.getElementById('panel').style.display = 'none';
+  selKey = null;
+}
+
+// ── Sign Board ─────────────────────────────────────────────────────────────
+let signKey = null;
+let signTab = 'info';
+
+function openSignBoard(c, r){
+  signKey = `${c}_${r}`;
+  signTab = 'info';
+  document.getElementById('signOverlay').classList.add('open');
+  const p = parcels[signKey];
+  const biomeLabel = p.biome.charAt(0).toUpperCase() + p.biome.slice(1);
+  document.getElementById('smTitle').textContent = (p.owner ? '🏴 ' + p.owner + "'s Land" : '📋 Land Board');
+  document.getElementById('smSub').textContent    = `Parcel ${c}, ${r} — ${biomeLabel}`;
+  renderSignTab();
+}
+
+function closeSignBoard(){
+  document.getElementById('signOverlay').classList.remove('open');
+  signKey = null;
+}
+
+function switchSignTab(tab){
+  signTab = tab;
+  document.querySelectorAll('.sTab').forEach((el,i)=>{
+    el.classList.toggle('on', ['info','board','offers'][i]===tab);
+  });
+  renderSignTab();
+}
+
+function renderSignTab(){
+  const body = document.getElementById('signBody');
+  const p    = parcels[signKey];
+  if(!p){ body.innerHTML=''; return; }
+
+  if(signTab === 'info'){
+    const biomeLabel = p.biome.charAt(0).toUpperCase() + p.biome.slice(1);
+    body.innerHTML = `
+      <div class="siRow">Biome     <span>${biomeLabel} ${BI[p.biome]}</span></div>
+      <div class="siRow">Status    <span style="color:${p.owner?'#e74c3c':'#27ae60'}">${p.owner?'Owned':'Available'}</span></div>
+      ${p.owner?`<div class="siRow">Owner     <span style="color:${p.color}">${p.owner}</span></div>`:''}
+      <div class="siRow">Parcel    <span>${p.c}, ${p.r}</span></div>
+      <div class="siRow">Size      <span>${P_T}&times;${P_T} tiles</span></div>
+      <div class="siRow">Messages  <span>${p.messages.length}</span></div>
+      <div class="siRow">Offers    <span>${p.offers.length}</span></div>
+      <div style="height:1px;background:#1a1a2e;margin:12px 0;"></div>
+      ${!p.owner?`<button class="sbBtn" style="width:100%;margin-top:2px;" onclick="claimFromBoard()">🏴 Claim this land</button>`:''}
+    `;
+  } else if(signTab === 'board'){
+    const msgs = p.messages.length
+      ? p.messages.slice().reverse().map(m=>`
+          <div class="msgCard">
+            <div class="msgAuthor">${m.author}</div>
+            <div class="msgText">${escHtml(m.text)}</div>
+            <div class="msgTime">${m.time}</div>
+          </div>`).join('')
+      : '<div class="emptyState">No messages posted yet.<br><span style="font-size:9px;color:#222">Be the first to write!</span></div>';
+    body.innerHTML = `
+      ${msgs}
+      <div class="postForm">
+        <div style="font-size:9px;color:#c9a84c;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Post a message</div>
+        <input id="msgAuthor" placeholder="Your name" maxlength="24">
+        <textarea id="msgText" placeholder="Write something..." maxlength="220"></textarea>
+        <button class="sbBtn" onclick="postMessage()">Post</button>
+      </div>`;
+  } else {
+    const ofrs = p.offers.length
+      ? p.offers.slice().reverse().map(o=>`
+          <div class="offerCard">
+            <div class="ofType">${o.type==='land'?'🏴 Land Purchase Offer':'📦 Resource Offer'}</div>
+            <div class="ofDetail">${escHtml(o.detail)} &mdash; <span class="ofPrice">${o.price} gold</span></div>
+            <div class="ofAuthor">by ${escHtml(o.author)} &bull; ${o.time}</div>
+          </div>`).join('')
+      : '<div class="emptyState">No offers yet.</div>';
+    body.innerHTML = `
+      ${ofrs}
+      <div class="ofForm">
+        <div style="font-size:9px;color:#c9a84c;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Make an offer</div>
+        <label>Your name</label>
+        <input id="ofAuthor" placeholder="Character name" maxlength="24">
+        <label>Offer type</label>
+        <select id="ofType">
+          <option value="land">Buy this land</option>
+          <option value="resource">Buy resources from this land</option>
+        </select>
+        <label>Details</label>
+        <input id="ofDetail" placeholder="e.g. 50 wheat, or full parcel" maxlength="80">
+        <label>Price (gold)</label>
+        <input id="ofPrice" type="number" min="1" placeholder="0">
+        <button class="sbBtnGold" style="margin-top:8px;" onclick="makeOffer()">Submit Offer</button>
+      </div>`;
+  }
+}
+
+function escHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function fmtTime(){
+  const d = new Date();
+  return d.toLocaleDateString()+' '+d.getHours()+':'+String(d.getMinutes()).padStart(2,'0');
+}
+
+function postMessage(){
+  const p    = parcels[signKey];
+  const name = document.getElementById('msgAuthor').value.trim();
+  const text = document.getElementById('msgText').value.trim();
+  if(!name){ showNotif('Enter your name.'); return; }
+  if(!text){ showNotif('Write something first.'); return; }
+  p.messages.push({ author: name, text, time: fmtTime() });
+  showNotif('Message posted!');
+  renderSignTab();
+}
+
+function makeOffer(){
+  const p      = parcels[signKey];
+  const author = document.getElementById('ofAuthor').value.trim();
+  const type   = document.getElementById('ofType').value;
+  const detail = document.getElementById('ofDetail').value.trim();
+  const price  = parseInt(document.getElementById('ofPrice').value) || 0;
+  if(!author){ showNotif('Enter your name.'); return; }
+  if(!detail){ showNotif('Add offer details.'); return; }
+  if(price < 1){ showNotif('Enter a price > 0.'); return; }
+  p.offers.push({ author, type, detail, price, time: fmtTime() });
+  showNotif('Offer posted!');
+  renderSignTab();
+}
+
+function claimFromBoard(){
+  const p    = parcels[signKey];
+  const [c,r] = signKey.split('_').map(Number);
+  const name = prompt('Enter your character name to claim:');
+  if(!name || !name.trim()) return;
+  if(p.owner){ showNotif('Already claimed!'); return; }
+  p.owner = name.trim();
+  const hue = hash(c*97+r, 29) % 360;
+  p.color = `hsl(${hue},32%,26%)`;
+  rebuildOv();
+  const claimed = Object.values(parcels).filter(q=>q.owner).length;
+  document.getElementById('claimedTxt').textContent = claimed;
+  showNotif('Land claimed by '+p.owner+'!');
+  openSignBoard(c, r);
+}
+
+// Close overlay on backdrop click
+document.getElementById('signOverlay').addEventListener('click', e=>{
+  if(e.target === document.getElementById('signOverlay')) closeSignBoard();
+});
+
+// ── Start ──────────────────────────────────────────────────────────────────
+resize();
+canvas.focus();
+// Reveal starting area before first frame
+const _pw = P_T * TILE;
+revealAround(Math.floor(player.x / _pw), Math.floor(player.y / _pw));
+rebuildOv();
+loop();
+</script>
+</body>
+</html>

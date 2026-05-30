@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Realm — District</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;user-select:none;}
+body{background:#080812;font-family:'Segoe UI',sans-serif;overflow:hidden;}
+#topbar{height:40px;background:#0c0c1a;border-bottom:1px solid #2a2a4a;display:flex;align-items:center;padding:0 16px;gap:10px;}
+#topbar h1{color:#c9a84c;font-size:12px;letter-spacing:2px;text-transform:uppercase;}
+.chip{background:#14142a;border:1px solid #2a2a4a;border-radius:4px;padding:2px 8px;font-size:10px;color:#aaa;white-space:nowrap;}
+.chip span{color:#c9a84c;font-weight:700;}
+#c{display:block;cursor:default;}
+
+#travelBar{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);width:280px;
+  background:#0c0c1acc;border:1px solid #2a2a4a;border-radius:8px;padding:10px 14px;
+  display:none;backdrop-filter:blur(5px);z-index:50;}
+#travelBar .tbDest{font-size:10px;color:#c9a84c;font-weight:700;margin-bottom:3px;}
+#travelBar .tbSub{font-size:9px;color:#555;margin-bottom:6px;}
+#travelBar .tbTrack{height:4px;background:#1a1a2e;border-radius:2px;overflow:hidden;}
+#travelBar .tbFill{height:100%;background:#c9a84c;border-radius:2px;width:0%;}
+
+#info{position:fixed;top:50px;right:12px;width:192px;background:#0c0c1acc;
+  border:1px solid #2a2a4a;border-radius:8px;padding:12px;backdrop-filter:blur(5px);}
+#info .iTitle{color:#c9a84c;font-size:11px;font-weight:700;margin-bottom:8px;}
+.iRow{display:flex;justify-content:space-between;font-size:10px;color:#555;
+  padding:4px 0;border-bottom:1px solid #0f0f20;}
+.iRow span{color:#bbb;}
+#info .iHint{font-size:9px;color:#2a2a3a;margin-top:8px;line-height:1.7;}
+
+
+#townBanner{position:fixed;top:52px;left:50%;transform:translateX(-50%);
+  background:#0d0a00cc;border:1px solid #c9a84c66;border-radius:8px;
+  padding:8px 22px;text-align:center;display:none;pointer-events:none;
+  backdrop-filter:blur(4px);z-index:100;}
+#townBanner .bnName{color:#c9a84c;font-size:13px;font-weight:700;}
+#townBanner .bnSub{color:#555;font-size:9px;margin-top:2px;}
+
+#notif{position:fixed;bottom:60px;left:50%;transform:translateX(-50%);
+  background:#0a0a1a;border:1px solid #c9a84c55;border-radius:6px;
+  padding:5px 16px;color:#c9a84c;font-size:11px;pointer-events:none;
+  opacity:0;transition:opacity .4s;white-space:nowrap;z-index:300;}
+
+#legend{position:fixed;bottom:10px;left:14px;font-size:9px;color:#252535;line-height:2.2;}
+
+#regionOverlay{position:fixed;inset:0;background:rgba(0,0,5,0.78);z-index:500;
+  display:none;align-items:center;justify-content:center;}
+#regionOverlay.open{display:flex;}
+#regionBox{background:#0d0d1e;border:2px solid #c9a84c66;border-radius:14px;
+  padding:30px 36px;text-align:center;min-width:270px;
+  box-shadow:0 0 50px rgba(0,0,0,0.95),0 0 20px rgba(201,168,76,0.12);}
+#regionBox .rIcon{font-size:42px;margin-bottom:10px;}
+#regionBox .rTitle{color:#c9a84c;font-size:16px;font-weight:700;margin-bottom:4px;letter-spacing:1px;}
+#regionBox .rSub{color:#555;font-size:10px;margin-bottom:14px;}
+#regionBox .rDesc{color:#888;font-size:11px;line-height:1.7;margin-bottom:22px;}
+#regionBox .rBtns{display:flex;gap:12px;justify-content:center;}
+#regionBox .rBtn{padding:9px 26px;border-radius:6px;cursor:pointer;font-size:11px;
+  font-family:inherit;transition:all .2s;}
+#regionBox .rBtn.yes{background:#0a120a;border:1px solid #27ae6088;color:#27ae60;}
+#regionBox .rBtn.yes:hover{border-color:#27ae60;background:#0f2a0f;box-shadow:0 0 10px rgba(39,174,96,0.25);}
+#regionBox .rBtn.no{background:#12080a;border:1px solid #ae272766;color:#ae6060;}
+#regionBox .rBtn.no:hover{border-color:#ae2727;background:#2a0f0f;}
+</style>
+</head>
+<body>
+<div id="topbar">
+  <h1>&#9876; Realm &mdash; District Map</h1>
+  <div class="chip">Tile <span id="posTxt">0,0</span></div>
+  <div class="chip">Status <span id="statusTxt">Idle</span></div>
+  <div class="chip">&#127968; <span>6</span> towns</div>
+  <div class="chip">&#128218; <span>10</span> markets</div>
+</div>
+<canvas id="c" tabindex="0"></canvas>
+
+<div id="travelBar">
+  <div class="tbDest" id="tbDest">—</div>
+  <div class="tbSub"  id="tbSub">—</div>
+  <div class="tbTrack"><div class="tbFill" id="tbFill"></div></div>
+</div>
+
+<div id="info">
+  <div class="iTitle" id="iTitle">District 0, 0</div>
+  <div id="iBody"></div>
+  <div class="iHint">Click an adjacent tile to travel.<br>2s per tile &bull; 1s each leg via market.</div>
+</div>
+
+
+<div id="townBanner">
+  <div class="bnName" id="bnName">—</div>
+  <div class="bnSub">You have arrived</div>
+</div>
+
+<div id="regionOverlay">
+  <div id="regionBox">
+    <div class="rIcon" id="rIcon">🗺️</div>
+    <div class="rTitle">Enter this Region?</div>
+    <div class="rSub"  id="rSub">District 0, 0</div>
+    <div class="rDesc" id="rDesc">Do you want to enter this region<br>and explore its 1&nbsp;025 lands?</div>
+    <div class="rBtns">
+      <button class="rBtn yes" onclick="enterRegion()">&#9654; Yes, Enter</button>
+      <button class="rBtn no"  onclick="closeRegionPopup()">Stay Here</button>
+    </div>
+  </div>
+</div>
+
+<div id="notif"></div>
+<div id="legend">&#127968; Town &nbsp;&nbsp; &#128218; Marketplace &nbsp;&nbsp; &#127823; District tile (1 025 lands)</div>
+
+<script>
+// ── Constants ──────────────────────────────────────────────────────────────
+const COLS = 9, ROWS = 8;  // col 8 is partial (rows 1-6 only)
+const CELL = 86;
+const GAP  = 30;
+const STEP = CELL + GAP;   // 116 px
+const TRAVEL_MS = 2000;    // direct tile travel
+const LEG_MS    = 1000;    // each leg through marketplace
+
+// ── Canvas ─────────────────────────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+let W = 0, H = 0, offX = 0, offY = 0;
+
+function resize(){
+  W = canvas.width  = window.innerWidth;
+  H = canvas.height = window.innerHeight - 40;
+  offX = Math.round((W - (COLS * STEP - GAP)) / 2);
+  offY = Math.round((H - (ROWS * STEP - GAP)) / 2);
+}
+window.addEventListener('resize', resize);
+
+// ── Deterministic hash ─────────────────────────────────────────────────────
+function hash(a, b){
+  let h = (a * 31337 + b * 7919) | 0;
+  h = ((h ^ (h >>> 16)) * 0x45d9f3b) | 0;
+  return (h ^ (h >>> 16)) & 0x7fffffff;
+}
+
+// ── Biomes ─────────────────────────────────────────────────────────────────
+const BIOMES = ['plains','forest','highland','wetland','desert','tundra'];
+const BC = {
+  plains:'#1a3010', forest:'#0d2008', highland:'#2a1e0e',
+  wetland:'#0c2020', desert:'#382a0c', tundra:'#141e2c'
+};
+const BI = { plains:'🌿', forest:'🌲', highland:'⛰️', wetland:'🌾', desert:'🏜️', tundra:'❄️' };
+
+// ── Tiles ──────────────────────────────────────────────────────────────────
+function tileExists(c,r){
+  if(c<0||c>=COLS||r<0||r>=ROWS) return false;
+  if(c===8 && (r<1||r>6)) return false; // col 8 only rows 1-6
+  return true;
+}
+const tiles = {};
+for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+  if(!tileExists(c,r)) continue;
+  tiles[`${c}_${r}`] = { c, r, biome: BIOMES[hash(c*3,r*7) % BIOMES.length], isTown:false, townName:null };
+}
+function tileAt(c,r){ return tiles[`${c}_${r}`]; }
+
+// 6 towns spread evenly
+[
+  [1,2,'Ashford'], [7,2,'Duskholm'],
+  [1,5,'Irongate'], [7,5,'Thalenveil'],
+  [4,5,'Embercrest'], [4,2,'Stormhaven']
+].forEach(([c,r,name])=>{ const t=tileAt(c,r); t.isTown=true; t.townName=name; });
+
+// ── Marketplaces on 10 edges ───────────────────────────────────────────────
+const allEdges = [];
+for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+  if(!tileExists(c,r)) continue;
+  if(tileExists(c+1,r)) allEdges.push({c1:c,r1:r,c2:c+1,r2:r});
+  if(tileExists(c,r+1)) allEdges.push({c1:c,r1:r,c2:c,r2:r+1});
+}
+// Seeded shuffle
+const sh = [...allEdges];
+for(let i=sh.length-1;i>0;i--){ const j=hash(i,99)%(i+1); [sh[i],sh[j]]=[sh[j],sh[i]]; }
+const MKT_EDGES = sh.slice(0,10).map((e,i)=>({...e,idx:i}));
+
+function edgeKey(c1,r1,c2,r2){
+  if(c1>c2||(c1===c2&&r1>r2)){[c1,c2]=[c2,c1];[r1,r2]=[r2,r1];}
+  return `${c1}_${r1}_${c2}_${r2}`;
+}
+const MKT_SET = new Set(MKT_EDGES.map(e=>edgeKey(e.c1,e.r1,e.c2,e.r2)));
+function hasMkt(c1,r1,c2,r2){ return MKT_SET.has(edgeKey(c1,r1,c2,r2)); }
+
+// ── Player ─────────────────────────────────────────────────────────────────
+const player = { c:0,r:0, traveling:false, fromC:0,fromR:0,toC:0,toR:0,
+                 progress:0, stage:null, startTime:0,
+                 path:[], destC:0, destR:0, totalLegs:0, legsDone:0,
+                 atMarketEdge:null,   // {c1,r1,c2,r2,idx} — approach/far tiles + market id
+                 pendingMarketEdge:null }; // set before toMarket leg fires
+
+function tileCenter(c,r){ return { x: offX+c*STEP+CELL/2, y: offY+r*STEP+CELL/2 }; }
+
+// ── BFS pathfinding ────────────────────────────────────────────────────────
+function bfs(fromC,fromR,toC,toR){
+  if(fromC===toC&&fromR===toR) return [];
+  const queue=[[fromC,fromR,[]]];
+  const vis=new Set([`${fromC}_${fromR}`]);
+  const dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+  while(queue.length){
+    const [c,r,path]=queue.shift();
+    for(const [dc,dr] of dirs){
+      const nc=c+dc,nr=r+dr,key=`${nc}_${nr}`;
+      if(!tileExists(nc,nr)||vis.has(key)) continue;
+      const np=[...path,{c:nc,r:nr}];
+      if(nc===toC&&nr===toR) return np;
+      vis.add(key); queue.push([nc,nr,np]);
+    }
+  }
+  return null;
+}
+
+function playerPos(){
+  if(player.atMarketEdge && !player.traveling){
+    const e=player.atMarketEdge;
+    const p1=tileCenter(e.c1,e.r1), p2=tileCenter(e.c2,e.r2);
+    return {x:(p1.x+p2.x)/2, y:(p1.y+p2.y)/2};
+  }
+  if(!player.traveling) return tileCenter(player.c, player.r);
+  const a=tileCenter(player.fromC,player.fromR), b=tileCenter(player.toC,player.toR);
+  return { x: a.x+(b.x-a.x)*player.progress, y: a.y+(b.y-a.y)*player.progress };
+}
+
+function tileName(c,r){ const t=tileAt(c,r); return t.isTown?t.townName:`(${c},${r})`; }
+
+// ── Travel ─────────────────────────────────────────────────────────────────
+
+// Begin a journey to a tile; handles departure from market if needed.
+function travel(toC,toR){
+  if(player.traveling) return;
+  if(!tileExists(toC,toR)){ showNotif('That tile does not exist.'); return; }
+
+  if(player.atMarketEdge){
+    const e=player.atMarketEdge;
+    player.atMarketEdge=null;
+    // BFS from both endpoints; pick whichever gives shorter total trip.
+    const pFwd=bfs(e.c2,e.r2,toC,toR); // forward: depart toward far tile
+    const pBwd=bfs(e.c1,e.r1,toC,toR); // backward: depart toward approach tile
+    const cFwd=pFwd?LEG_MS+pFwd.length*TRAVEL_MS:Infinity;
+    const cBwd=pBwd?LEG_MS+pBwd.length*TRAVEL_MS:Infinity;
+    if(cFwd===Infinity&&cBwd===Infinity){ showNotif('No path found.'); return; }
+    if(cFwd<=cBwd){
+      // Forward departure (approach→far, progress 0.5→1)
+      player.fromC=e.c1; player.fromR=e.r1;
+      player.toC=e.c2; player.toR=e.r2;
+      player.stage='fromMarket'; player.progress=0.5;
+      player.path=(pFwd||[]).map(p=>({type:'tile',c:p.c,r:p.r}));
+      player.totalLegs=1+(pFwd?pFwd.length:0);
+    } else {
+      // Backward departure (far→approach, visually progress 0.5→0)
+      player.fromC=e.c2; player.fromR=e.r2;
+      player.toC=e.c1; player.toR=e.r1;
+      player.stage='fromMarketBack'; player.progress=0.5;
+      player.path=(pBwd||[]).map(p=>({type:'tile',c:p.c,r:p.r}));
+      player.totalLegs=1+(pBwd?pBwd.length:0);
+    }
+    player.legsDone=1; player.destC=toC; player.destR=toR;
+    player.traveling=true; player.startTime=Date.now();
+    const dest=tileAt(toC,toR);
+    document.getElementById('tbDest').textContent=(dest&&dest.isTown?'🏰 ':'')+tileName(toC,toR);
+    document.getElementById('travelBar').style.display='block';
+    document.getElementById('statusTxt').textContent='Traveling';
+    return;
+  }
+
+  if(toC===player.c&&toR===player.r) return;
+  const path=bfs(player.c,player.r,toC,toR);
+  if(!path||path.length===0){ showNotif('No path found.'); return; }
+  player.path=path.map(p=>({type:'tile',c:p.c,r:p.r}));
+  player.destC=toC; player.destR=toR;
+  player.totalLegs=path.length; player.legsDone=0;
+  startNextLeg();
+}
+
+// Advance to the next queued path step.
+function startNextLeg(){
+  const next=player.path.shift();
+  player.legsDone++;
+
+  if(!next.type||next.type==='tile'){
+    player.fromC=player.c; player.fromR=player.r;
+    player.toC=next.c; player.toR=next.r;
+    player.stage='direct'; player.progress=0;
+  } else if(next.type==='market'){
+    // Arrive at market midpoint from current tile (approach)
+    const e=player.pendingMarketEdge;
+    const farC=e.c1===player.c&&e.r1===player.r?e.c2:e.c1;
+    const farR=e.c1===player.c&&e.r1===player.r?e.r2:e.r1;
+    player.fromC=player.c; player.fromR=player.r;
+    player.toC=farC; player.toR=farR;
+    player.stage='toMarket'; player.progress=0;
+  }
+
+  player.traveling=true; player.startTime=Date.now();
+  const destLabel=player.destC>=0
+    ?((tileAt(player.destC,player.destR)||{}).isTown?'🏰 ':'')+tileName(player.destC,player.destR)
+    :'📦 Market';
+  document.getElementById('tbDest').textContent=destLabel;
+  document.getElementById('travelBar').style.display='block';
+  document.getElementById('statusTxt').textContent='Traveling';
+}
+
+// Click a marketplace icon — route there from anywhere, then stop on it.
+function travelViaMarket(mkt){
+  if(player.traveling) return;
+  if(player.atMarketEdge&&player.atMarketEdge.idx===mkt.idx) return;
+
+  const prevMkt=player.atMarketEdge;
+  player.atMarketEdge=null;
+
+  // Starting tile for BFS: far tile of previous market (if at one), else normal tile.
+  const startC=prevMkt?prevMkt.c2:player.c;
+  const startR=prevMkt?prevMkt.r2:player.r;
+
+  // BFS to each endpoint of the target market; pick shorter path.
+  const p1=bfs(startC,startR,mkt.c1,mkt.r1);
+  const p2=bfs(startC,startR,mkt.c2,mkt.r2);
+  if(!p1&&!p2){ showNotif('No path to market.'); return; }
+
+  let approachC,approachR,farC,farR,bfsPath;
+  if(!p2||(p1&&p1.length<=p2.length)){
+    approachC=mkt.c1; approachR=mkt.r1; farC=mkt.c2; farR=mkt.r2; bfsPath=p1;
+  } else {
+    approachC=mkt.c2; approachR=mkt.r2; farC=mkt.c1; farR=mkt.r1; bfsPath=p2;
+  }
+
+  player.pendingMarketEdge={c1:approachC,r1:approachR,c2:farC,r2:farR,idx:mkt.idx};
+  player.destC=-1; player.destR=-1;
+
+  const tilePath=(bfsPath||[]).map(p=>({type:'tile',c:p.c,r:p.r}));
+
+  if(prevMkt){
+    // Depart previous market (forward, progress 0.5→1 toward prevMkt.c2) then follow BFS.
+    player.fromC=prevMkt.c1; player.fromR=prevMkt.r1;
+    player.toC=prevMkt.c2; player.toR=prevMkt.r2;
+    player.stage='fromMarket'; player.progress=0.5;
+    player.path=[...tilePath,{type:'market'}];
+    player.totalLegs=1+player.path.length; player.legsDone=1;
+    player.traveling=true; player.startTime=Date.now();
+  } else {
+    player.path=[...tilePath,{type:'market'}];
+    player.totalLegs=player.path.length; player.legsDone=0;
+    startNextLeg();
+    return;
+  }
+
+  document.getElementById('tbDest').textContent='📦 Market';
+  document.getElementById('travelBar').style.display='block';
+  document.getElementById('statusTxt').textContent='Traveling';
+}
+
+function updateTravel(){
+  if(!player.traveling) return;
+  const el=Date.now()-player.startTime;
+  const stepInfo=player.totalLegs>1?` — ${player.legsDone}/${player.totalLegs}`:'';
+
+  if(player.stage==='direct'){
+    player.progress=Math.min(1,el/TRAVEL_MS);
+    document.getElementById('tbSub').textContent=Math.max(0,((TRAVEL_MS-el)/1000)).toFixed(1)+'s'+stepInfo;
+    if(player.progress>=1) arrive();
+
+  } else if(player.stage==='toMarket'){
+    player.progress=Math.min(0.5,(el/LEG_MS)*0.5);
+    document.getElementById('tbSub').textContent=Math.max(0,((LEG_MS-el)/1000)).toFixed(1)+'s (market)'+stepInfo;
+    if(el>=LEG_MS) arriveAtMarket();
+
+  } else if(player.stage==='fromMarket'){
+    const t=Math.min(1,el/LEG_MS);
+    player.progress=0.5+t*0.5;
+    document.getElementById('tbSub').textContent=Math.max(0,((LEG_MS-el)/1000)).toFixed(1)+'s'+stepInfo;
+    if(t>=1) arrive();
+
+  } else if(player.stage==='fromMarketBack'){
+    const t=Math.min(1,el/LEG_MS);
+    player.progress=0.5-t*0.5; // midpoint → approach tile
+    document.getElementById('tbSub').textContent=Math.max(0,((LEG_MS-el)/1000)).toFixed(1)+'s'+stepInfo;
+    if(t>=1) arrive();
+  }
+
+  document.getElementById('tbFill').style.width=(player.progress*100)+'%';
+}
+
+function arriveAtMarket(){
+  // Player is at market midpoint; far tile becomes logical position.
+  player.c=player.toC; player.r=player.toR;
+  player.atMarketEdge=player.pendingMarketEdge;
+  player.traveling=false; player.progress=0;
+  document.getElementById('travelBar').style.display='none';
+  document.getElementById('statusTxt').textContent='At Market';
+  document.getElementById('posTxt').textContent=player.c+','+player.r;
+}
+
+function arrive(){
+  // For fromMarketBack the destination is fromC (going backward toward approach tile).
+  player.c=player.stage==='fromMarketBack'?player.fromC:player.toC;
+  player.r=player.stage==='fromMarketBack'?player.fromR:player.toR;
+  player.atMarketEdge=null;
+  player.traveling=false; player.progress=0;
+  document.getElementById('posTxt').textContent=player.c+','+player.r;
+  if(player.path.length>0){ startNextLeg(); return; }
+  document.getElementById('travelBar').style.display='none';
+  document.getElementById('statusTxt').textContent='Idle';
+  updateInfoPanel();
+  const t=tileAt(player.c,player.r);
+  if(t&&t.isTown){
+    document.getElementById('bnName').textContent='🏰 '+t.townName;
+    const b=document.getElementById('townBanner');
+    b.style.display='block';
+    setTimeout(()=>{ b.style.display='none'; showRegionPopup(); },1800);
+  } else {
+    showRegionPopup();
+  }
+}
+
+// ── Region entry popup ─────────────────────────────────────────────────────
+let _regionIsTown = false;
+
+function showRegionPopup(){
+  const t=tileAt(player.c,player.r);
+  _regionIsTown=!!(t&&t.isTown);
+  document.getElementById('rIcon').textContent=_regionIsTown?'🏰':'🗺️';
+  document.getElementById('rSub').textContent=_regionIsTown?t.townName:`District ${player.c}, ${player.r}`;
+  document.getElementById('rDesc').innerHTML=_regionIsTown
+    ?'Do you want to enter this city<br>and begin your adventure?'
+    :'Do you want to enter this region<br>and explore its 1&nbsp;025 lands?';
+  document.querySelector('#regionBox .rBtn.yes').textContent=
+    _regionIsTown?'⚔ Enter City':'▶ Yes, Enter';
+  document.getElementById('regionOverlay').classList.add('open');
+}
+function closeRegionPopup(){
+  document.getElementById('regionOverlay').classList.remove('open');
+}
+function enterRegion(){
+  closeRegionPopup();
+  const url=_regionIsTown
+    ?'file:///C:/Users/b1gbo/Desktop/Demo/realm_final(3).html'
+    :`file:///C:/Users/b1gbo/Desktop/Demo/Lands.html?fromC=${player.c}&fromR=${player.r}`;
+  window.open(url,'_blank');
+}
+
+// ── Info panel ─────────────────────────────────────────────────────────────
+function updateInfoPanel(){
+  const t=tileAt(player.c,player.r);
+  const b=t.biome.charAt(0).toUpperCase()+t.biome.slice(1);
+  document.getElementById('iTitle').textContent=t.isTown?('🏰 '+t.townName):('District '+player.c+', '+player.r);
+  document.getElementById('iBody').innerHTML=`
+    <div class="iRow">Type   <span style="color:${t.isTown?'#c9a84c':'#aaa'}">${t.isTown?'Town':'Land District'}</span></div>
+    <div class="iRow">Biome  <span>${b} ${BI[t.biome]}</span></div>
+    <div class="iRow">Coords <span>${t.c}, ${t.r}</span></div>
+    <div class="iRow">Lands  <span>1 025 tiles</span></div>
+  `;
+}
+
+// ── Notif ──────────────────────────────────────────────────────────────────
+let notifT=null;
+function showNotif(msg){
+  const el=document.getElementById('notif');
+  el.textContent=msg; el.style.opacity='1';
+  clearTimeout(notifT); notifT=setTimeout(()=>el.style.opacity='0',2600);
+}
+
+// ── Draw ───────────────────────────────────────────────────────────────────
+function draw(){
+  ctx.clearRect(0,0,W,H);
+
+  // Roads
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+    if(!tileExists(c,r)) continue;
+    const p=tileCenter(c,r);
+    [[c+1,r],[c,r+1]].forEach(([nc,nr])=>{
+      if(!tileExists(nc,nr)) return;
+      const q=tileCenter(nc,nr);
+      ctx.strokeStyle='#141428'; ctx.lineWidth=GAP-2; ctx.lineCap='round';
+      ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(q.x,q.y); ctx.stroke();
+      ctx.strokeStyle='#1e1e38'; ctx.lineWidth=1.5;
+      ctx.setLineDash([5,9]);
+      ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(q.x,q.y); ctx.stroke();
+      ctx.setLineDash([]);
+    });
+  }
+
+  // Tiles
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+    if(!tileExists(c,r)) continue;
+    const t=tileAt(c,r);
+    const sx=offX+c*STEP, sy=offY+r*STEP;
+    const isHere=!player.traveling&&!player.atMarketEdge&&c===player.c&&r===player.r;
+    const isAdj=!player.traveling&&!player.atMarketEdge&&Math.abs(c-player.c)+Math.abs(r-player.r)===1;
+
+    // Shadow
+    ctx.fillStyle='rgba(0,0,0,0.5)';
+    ctx.fillRect(sx+4,sy+4,CELL,CELL);
+
+    // Base
+    ctx.fillStyle=t.isTown?'#100c1e':BC[t.biome];
+    ctx.fillRect(sx,sy,CELL,CELL);
+
+    // Town tint
+    if(t.isTown){
+      const g=ctx.createLinearGradient(sx,sy,sx+CELL,sy+CELL);
+      g.addColorStop(0,'rgba(201,168,76,0.10)');
+      g.addColorStop(1,'rgba(80,40,120,0.18)');
+      ctx.fillStyle=g; ctx.fillRect(sx,sy,CELL,CELL);
+    }
+
+    if(isHere){ ctx.fillStyle='rgba(39,174,96,0.10)'; ctx.fillRect(sx,sy,CELL,CELL); }
+
+    // Adjacent dashed hint
+    if(isAdj){
+      ctx.strokeStyle='rgba(255,255,255,0.14)'; ctx.lineWidth=1;
+      ctx.setLineDash([4,5]);
+      ctx.strokeRect(sx+1,sy+1,CELL-2,CELL-2);
+      ctx.setLineDash([]);
+    }
+
+    // Border
+    ctx.strokeStyle=t.isTown?'#c9a84c':isHere?'#27ae60':'#1a1a30';
+    ctx.lineWidth=t.isTown||isHere?2:1;
+    ctx.strokeRect(sx+0.5,sy+0.5,CELL-1,CELL-1);
+
+    // Biome ghost icon
+    ctx.font='28px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.globalAlpha=t.isTown?0.06:0.14;
+    ctx.fillStyle='#fff';
+    ctx.fillText(BI[t.biome],sx+CELL/2,sy+CELL/2);
+    ctx.globalAlpha=1;
+
+    // Town content
+    if(t.isTown){
+      ctx.font='22px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('🏰',sx+CELL/2,sy+CELL/2-9);
+      ctx.font='bold 8px Segoe UI'; ctx.fillStyle='#c9a84c';
+      ctx.fillText(t.townName,sx+CELL/2,sy+CELL-10);
+    } else {
+      ctx.fillStyle='rgba(255,255,255,0.12)'; ctx.font='7px monospace';
+      ctx.textAlign='left'; ctx.textBaseline='top';
+      ctx.fillText(c+','+r,sx+4,sy+4);
+    }
+  }
+
+  // Marketplace icons
+  MKT_EDGES.forEach(e=>{
+    const p1=tileCenter(e.c1,e.r1), p2=tileCenter(e.c2,e.r2);
+    const mx=(p1.x+p2.x)/2, my=(p1.y+p2.y)/2;
+    const here=!!player.atMarketEdge&&player.atMarketEdge.idx===e.idx;
+    ctx.save();
+    ctx.shadowColor=here?'#27ae60':'rgba(201,168,76,0.45)';
+    ctx.shadowBlur=here?22:10;
+    ctx.fillStyle=here?'#0d2018':'#0d0d1e';
+    ctx.beginPath(); ctx.arc(mx,my,here?15:13,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle=here?'#27ae60':'#c9a84c55'; ctx.lineWidth=here?2.5:1.5; ctx.stroke();
+    ctx.restore();
+    ctx.font='13px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('📦',mx,my);
+  });
+
+  // Player
+  const pp=playerPos();
+  ctx.save();
+  ctx.shadowColor='#27ae60'; ctx.shadowBlur=18;
+  ctx.fillStyle='#0d2018';
+  ctx.beginPath(); ctx.arc(pp.x,pp.y,13,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='#27ae60'; ctx.lineWidth=2.5; ctx.stroke();
+  ctx.restore();
+  ctx.font='13px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('🧙',pp.x,pp.y);
+}
+
+// ── Click ──────────────────────────────────────────────────────────────────
+canvas.addEventListener('click',e=>{
+  if(player.traveling) return;
+  const rect=canvas.getBoundingClientRect();
+  const cx=e.clientX-rect.left, cy=e.clientY-rect.top;
+  // Marketplace clicks take priority
+  for(const mkt of MKT_EDGES){
+    const p1=tileCenter(mkt.c1,mkt.r1), p2=tileCenter(mkt.c2,mkt.r2);
+    const mx=(p1.x+p2.x)/2, my=(p1.y+p2.y)/2;
+    if(Math.hypot(cx-mx,cy-my)<=15){ travelViaMarket(mkt); return; }
+  }
+  // Tile clicks
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+    if(!tileExists(c,r)) continue;
+    const sx=offX+c*STEP, sy=offY+r*STEP;
+    if(cx>=sx&&cx<sx+CELL&&cy>=sy&&cy<sy+CELL){ travel(c,r); return; }
+  }
+});
+
+canvas.addEventListener('mousemove',e=>{
+  if(player.traveling){ canvas.style.cursor='default'; return; }
+  const rect=canvas.getBoundingClientRect();
+  const cx=e.clientX-rect.left, cy=e.clientY-rect.top;
+  for(const mkt of MKT_EDGES){
+    const p1=tileCenter(mkt.c1,mkt.r1), p2=tileCenter(mkt.c2,mkt.r2);
+    const mx=(p1.x+p2.x)/2, my=(p1.y+p2.y)/2;
+    if(Math.hypot(cx-mx,cy-my)<=15){ canvas.style.cursor='pointer'; return; }
+  }
+  canvas.style.cursor='default';
+});
+
+// ── Init ───────────────────────────────────────────────────────────────────
+(function(){
+  const p=new URLSearchParams(window.location.search);
+  const pc=parseInt(p.get('c')), pr=parseInt(p.get('r'));
+  if(!isNaN(pc)&&!isNaN(pr)&&tileExists(pc,pr)){ player.c=pc; player.r=pr; }
+})();
+resize(); updateInfoPanel(); canvas.focus();
+function loop(){ updateTravel(); draw(); requestAnimationFrame(loop); }
+loop();
+</script>
+</body>
+</html>

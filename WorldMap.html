@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>World Map</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#000; overflow:hidden; display:flex; align-items:center; justify-content:center; width:100vw; height:100vh; }
+#wrap { position:relative; display:inline-block; }
+#mapImg { display:block; }
+#cv { position:absolute; top:0; left:0; cursor:default; }
+#hint { position:fixed; bottom:14px; left:50%; transform:translateX(-50%);
+  font:10px Georgia,serif; color:rgba(200,168,60,0.45); pointer-events:none; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <img id="mapImg" src="1ab45a17-5e77-4e70-8ab1-8ab211ac30d9.png" draggable="false">
+  <canvas id="cv"></canvas>
+</div>
+<div id="hint">Press D to toggle guild zone outlines</div>
+
+<script>
+// ── Image native size ─────────────────────────────────────────────────────────
+const NAT_W = 1536, NAT_H = 1024;
+
+// ── Guild hotspots (as fraction of native image size) ────────────────────────
+// cx/cy = center, rx/ry = radii  — all in 0..1 proportional coords
+const GUILDS = [
+  { name:'Guild 1', cx:0.284, cy:0.175, rx:0.110, ry:0.120 },  // top-left   green
+  { name:'Guild 2', cx:0.705, cy:0.175, rx:0.110, ry:0.118 },  // top-right  blue
+  { name:'Guild 3', cx:0.840, cy:0.450, rx:0.100, ry:0.130 },  // right      gold
+  { name:'Guild 4', cx:0.628, cy:0.718, rx:0.108, ry:0.118 },  // bot-right  purple
+  { name:'Guild 5', cx:0.308, cy:0.712, rx:0.105, ry:0.118 },  // bot-left   teal
+  { name:'Guild 6', cx:0.162, cy:0.448, rx:0.096, ry:0.132 },  // left       red
+];
+
+// ── State ────────────────────────────────────────────────────────────────────
+let scale = 1;
+let hovered = -1;
+let debug = true;   // start with outlines visible
+
+const img = document.getElementById('mapImg');
+const cv  = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+
+// ── Resize / scale ────────────────────────────────────────────────────────────
+function resize() {
+  scale = Math.min(window.innerWidth / NAT_W, window.innerHeight / NAT_H);
+  const dw = Math.round(NAT_W * scale), dh = Math.round(NAT_H * scale);
+  img.width = dw; img.height = dh;
+  cv.width  = dw; cv.height  = dh;
+  draw();
+}
+
+// ── Convert fraction → pixel (in canvas space) ───────────────────────────────
+function px(fx) { return fx * NAT_W * scale; }
+function py(fy) { return fy * NAT_H * scale; }
+
+// ── Hit test ─────────────────────────────────────────────────────────────────
+function hit(canvX, canvY, g) {
+  const dx = (canvX - px(g.cx)) / px(g.rx);
+  const dy = (canvY - py(g.cy)) / py(g.ry);
+  return dx*dx + dy*dy <= 1;
+}
+
+// ── Draw ─────────────────────────────────────────────────────────────────────
+function draw() {
+  ctx.clearRect(0, 0, cv.width, cv.height);
+
+  GUILDS.forEach((g, i) => {
+    const isHov = i === hovered;
+    const ecx = px(g.cx), ecy = py(g.cy), erx = px(g.rx), ery = py(g.ry);
+
+    // Always-visible subtle ring (debug mode or hover)
+    if (debug || isHov) {
+      ctx.save();
+      if (isHov) {
+        ctx.shadowColor = 'rgba(200,168,60,0.9)';
+        ctx.shadowBlur  = 28;
+        ctx.strokeStyle = 'rgba(220,185,70,0.85)';
+        ctx.lineWidth   = 3;
+      } else {
+        ctx.strokeStyle = 'rgba(200,168,60,0.28)';
+        ctx.lineWidth   = 1.5;
+        ctx.setLineDash([6, 8]);
+      }
+      ctx.beginPath();
+      ctx.ellipse(ecx, ecy, erx, ery, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+
+    // Hover fill + label
+    if (isHov) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(200,168,60,0.07)';
+      ctx.beginPath();
+      ctx.ellipse(ecx, ecy, erx, ery, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Tooltip badge below island
+      const ty = ecy + ery + py(0.04);
+      const label = g.name + ' — Click to Enter District';
+      ctx.font = `bold ${Math.round(13 * scale)}px Georgia,serif`;
+      const tw = ctx.measureText(label).width;
+      ctx.fillStyle = 'rgba(0,0,0,0.65)';
+      ctx.beginPath();
+      ctx.roundRect(ecx - tw/2 - 10, ty - 11*scale, tw + 20, 22*scale, 4*scale);
+      ctx.fill();
+      ctx.fillStyle = '#c8a84c';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor = 'rgba(200,168,60,0.7)';
+      ctx.shadowBlur = 8;
+      ctx.fillText(label, ecx, ty);
+      ctx.restore();
+
+      // Guild name inside the ellipse
+      ctx.save();
+      ctx.font = `bold ${Math.round(15 * scale)}px Georgia,serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(255,240,180,0.9)';
+      ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 10;
+      ctx.fillText(g.name, ecx, ecy);
+      ctx.restore();
+    }
+
+    // Debug number label (always shown in debug mode)
+    if (debug && !isHov) {
+      ctx.save();
+      ctx.font = `bold ${Math.round(12 * scale)}px Georgia,serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(200,168,60,0.55)';
+      ctx.fillText(g.name, ecx, ecy);
+      ctx.restore();
+    }
+  });
+}
+
+// ── Events ────────────────────────────────────────────────────────────────────
+cv.addEventListener('mousemove', e => {
+  const r = cv.getBoundingClientRect();
+  const mx = e.clientX - r.left, my = e.clientY - r.top;
+  const prev = hovered;
+  hovered = GUILDS.findIndex(g => hit(mx, my, g));
+  cv.style.cursor = hovered >= 0 ? 'pointer' : 'default';
+  if (hovered !== prev) draw();
+});
+
+cv.addEventListener('mouseleave', () => {
+  if (hovered !== -1) { hovered = -1; draw(); }
+});
+
+cv.addEventListener('click', e => {
+  const r = cv.getBoundingClientRect();
+  const mx = e.clientX - r.left, my = e.clientY - r.top;
+  const clicked = GUILDS.findIndex(g => hit(mx, my, g));
+  if (clicked >= 0) {
+    window.open('District.html', '_blank');
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'd' || e.key === 'D') { debug = !debug; draw(); }
+});
+
+window.addEventListener('resize', resize);
+img.addEventListener('load', resize);
+
+// If image is already cached
+if (img.complete) resize();
+</script>
+</body>
+</html>
