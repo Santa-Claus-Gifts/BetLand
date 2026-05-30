@@ -568,7 +568,7 @@ canvas.addEventListener('click', e => {
     if(_hasPortal){
       const ppx = PORTAL_WX - camX, ppy = PORTAL_WY - camY;
       if(Math.hypot(cx - ppx, cy - ppy) < 26){
-        window.open(`file:///C:/Users/b1gbo/Desktop/Demo/District.html?c=${_portalFromC}&r=${_portalFromR}`, '_blank');
+        window.location.href = `District.html?c=${_portalFromC}&r=${_portalFromR}`;
         return;
       }
     }
